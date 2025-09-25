@@ -7,7 +7,8 @@ import bcrypt from 'bcryptjs';
 // 회원가입
 export const signup = async (req, res) => {
   const { fullName, email, password } = await req.body;
-  const name = typeof fullName === 'string' ? email.trim().toLowerCase() : '';
+  const name =
+    typeof fullName === 'string' ? fullName.trim().toLowerCase() : '';
   const normalizedEmail =
     typeof email === 'string' ? email.trim().toLowerCase() : '';
   const pass = typeof password === 'string' ? password : '';
@@ -47,7 +48,7 @@ export const signup = async (req, res) => {
 
       const savedUser = await newUser.save();
 
-      res.status(201).json({
+      res.status(200).json({
         _id: savedUser.id,
         fullName: savedUser.fullName,
         email: savedUser.email,
@@ -68,6 +69,49 @@ export const signup = async (req, res) => {
     }
   } catch (error) {
     console.log('Error in signup controller:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// 로그인
+export const login = async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+    // never tell the client which on is incorrect: password or email
+
+    const isPasswordCorrect = await bcrypt.compare(password, user.password);
+    if (!isPasswordCorrect) {
+      return res.status(400).json({ message: 'Invalid credentials' });
+    }
+
+    generateToken(user._id, res);
+
+    res.status(200).json({
+      _id: user.id,
+      fullName: user.fullName,
+      email: user.email,
+      profilePic: user.profilePic,
+    });
+  } catch (error) {
+    console.error('Error in login controller:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+// 로그아웃
+export const logout = async (_, res) => {
+  try {
+    res.cookie('jwt', '', { maxAge: 0 });
+    res.status(200).json({ message: 'Logged out successfully' });
+  } catch (error) {
+    console.error('Error in logout controller:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };
